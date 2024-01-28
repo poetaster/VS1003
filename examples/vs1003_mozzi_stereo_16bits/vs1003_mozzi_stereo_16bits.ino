@@ -270,7 +270,7 @@ void playSound() {
     uint8_t*data = HelloMP3;
     
     
-    sdi_send_buffer(HelloMP3, sizeof(HelloMP3));
+    send_buffer(HelloMP3, sizeof(HelloMP3));
   }
 
 }
@@ -282,7 +282,7 @@ void loop() {
   VSStatus();
   delay(1000);
   //playSound();
-  //sdi_send_buffer(HelloMP3, sizeof(HelloMP3));
+  //send_buffer(HelloMP3, sizeof(HelloMP3));
   delay(1000);
 }
 
@@ -370,17 +370,18 @@ void initialiseVS10xx () {
 
   ///From 1053Driver
   delay(10);
-  await_data_request();
+  while (!digitalRead(VS_DREQ)) ; 
 
   VSWriteRegister16(SCI_AUDATA, 16384);
   // The next clocksetting allows SPI clocking at 5 MHz, 4 MHz is safe then.
   VSWriteRegister16(SCI_CLOCKF, 6 << 12);
   SPI.setClockDivider(SPI_CLOCK_DIV4);
 
-  VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV( SM_LINE1 ));
+  VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV( SM_STREAM ));
   //VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV( SM_RESET ));
   delay(10);
-  await_data_request();
+  while (!digitalRead(VS_DREQ)) ;
+
   VSWriteRegister16(SCI_CLOCKF,0xB800); 
   /// END
   /*
@@ -529,13 +530,40 @@ uint16_t VSReadRegister(unsigned char addressbyte) {
   return ((d1 << 8) | d2);
 }
 
+
+int vs1053_chunk_size = 32;
+
+void send_buffer(uint8_t *data, size_t len) {
+  size_t chunk_length;
+  while (!digitalRead(VS_DREQ)) {}
+  digitalWrite(VS_XDCS, LOW);
+  
+  while (len) {
+        //await_data_request(); // Wait for space available
+        chunk_length = len;
+        if (len > vs1053_chunk_size) {
+            chunk_length = vs1053_chunk_size;
+        }
+        len -= chunk_length;
+        SPI.transfer(data, chunk_length);
+        data += chunk_length;
+                             //
+    }
+
+
+  digitalWrite(VS_XDCS, HIGH);
+  
+}
+
 /* from VS1053 driver */
 void writeAudio(uint8_t*data, size_t len) {
   sdi_send_buffer(data, len);
 }
-int vs1053_chunk_size = 32;
-/*
-  void sdi_send_buffer(uint8_t *data, size_t len) {
+
+
+
+
+void sdi_send_buffer(uint8_t *data, size_t len) {
     size_t chunk_length; // Length of chunk 32 byte or shorter
     data_mode_on();
     Serial.println ('writing');
@@ -552,7 +580,8 @@ int vs1053_chunk_size = 32;
                              //
     }
     data_mode_off();
-  } */
+  } 
+/*
 void sdi_send_buffer(uint8_t* data, size_t len)
 {
 
@@ -573,8 +602,21 @@ void sdi_send_buffer(uint8_t* data, size_t len)
   while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating command is complete
   Serial.print("VS off");
   digitalWrite(VS_XDCS, HIGH); //Deselect Control
+}
+*/
 
+void streamModeOn() {
+    //VS1053_LOGI("Performing streamModeOn");
+    VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_STREAM));
+    delay(10);
+    await_data_request();
+}
 
+void streamModeOff() {
+    //VS1053_LOGI("Performing streamModeOff");
+    VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW));
+    delay(10);
+    await_data_request();
 }
 
 void write_bytes(uint8_t * data, uint32_t size)   {
