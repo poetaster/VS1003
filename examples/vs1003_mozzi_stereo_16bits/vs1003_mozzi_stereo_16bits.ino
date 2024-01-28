@@ -11,6 +11,7 @@
 
 //#include "vs10xx_uc.h" // From VLSI website: http://www.vlsi.fi/en/support/software/microcontrollersoftware.html */
 //#include "dac1003b.h"
+
 // SCI Register
 const uint8_t SCI_MODE = 0x0;
 const uint8_t SCI_STATUS = 0x1;
@@ -63,9 +64,9 @@ const uint16_t  SS_VER_VS1053 = 0x40;
 const uint16_t  SS_VER_VS1003 = 0x30;
 
 // VS1053 Shield pin definitions
-#define VS_XCS    6 // Control Chip Select Pin (for accessing SPI Control/Status registers)
-#define VS_XDCS   7 // Data Chip Select / BSYNC Pin
-#define VS_DREQ   9 // Data Request Pin: Player asks for more data
+#define VS_XCS    9 // Control Chip Select Pin (for accessing SPI Control/Status registers)
+#define VS_XDCS   6 // Data Chip Select / BSYNC Pin
+#define VS_DREQ   7 // Data Request Pin: Player asks for more data
 #define VS_RESET  8 // Reset is active low
 
 
@@ -79,7 +80,7 @@ const uint16_t  SS_VER_VS1003 = 0x30;
 #define CONTROL_RATE 256 // Hz, powers of 2 are most reliable
 
 #define TEST 1
-#define SINTEST 1
+//#define SINTEST 1
 
 #ifdef TEST
 char teststr[32];
@@ -269,26 +270,7 @@ void playSound() {
     uint8_t*data = HelloMP3;
     
     
-    //sdi_send_buffer(HelloMP3, sizeof(HelloMP3));
-    
-    while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating IC is available
-    digitalWrite(VS_XDCS, LOW); //Select control
-
-    while ( len )
-    {
-      await_data_request();
-      delayMicroseconds(3);
-
-      size_t chunk_length = min(len, 32);
-      len -= chunk_length;
-      while ( chunk_length-- )
-        SPI.transfer(*data++);
-    }
-    while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating command is complete
-    digitalWrite(VS_XDCS, HIGH); //Deselect Control
-    VSStatus();
-
-
+    sdi_send_buffer(HelloMP3, sizeof(HelloMP3));
   }
 
 }
@@ -296,9 +278,12 @@ void playSound() {
 void loop() {
 
   Serial.println("loop");
-  //playSound();
+  
   VSStatus();
-  delay(2000);
+  delay(1000);
+  //playSound();
+  //sdi_send_buffer(HelloMP3, sizeof(HelloMP3));
+  delay(1000);
 }
 
 /***********************************************************************************************
@@ -387,16 +372,25 @@ void initialiseVS10xx () {
   delay(10);
   await_data_request();
 
-  VSWriteRegister16(SCI_AUDATA, 44101);
+  VSWriteRegister16(SCI_AUDATA, 16384);
   // The next clocksetting allows SPI clocking at 5 MHz, 4 MHz is safe then.
   VSWriteRegister16(SCI_CLOCKF, 6 << 12);
   SPI.setClockDivider(SPI_CLOCK_DIV4);
 
   VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV( SM_LINE1 ));
+  //VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV( SM_RESET ));
   delay(10);
   await_data_request();
+  VSWriteRegister16(SCI_CLOCKF,0xB800); 
   /// END
-
+  /*
+  write_register(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_RESET));
+  delay(1);
+  await_data_request();
+  write_register(SCI_CLOCKF,0xB800); // Experimenting with higher clock settings
+  delay(1);
+  await_data_request();
+*/
   delay(200);
   //VSStatus();
 #ifdef TEST
@@ -559,10 +553,11 @@ int vs1053_chunk_size = 32;
     }
     data_mode_off();
   } */
-void sdi_send_buffer(const uint8_t* data, size_t len)
+void sdi_send_buffer(uint8_t* data, size_t len)
 {
 
   while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating IC is available
+  Serial.print("VS ready");
   digitalWrite(VS_XDCS, LOW); //Select control
 
   while ( len )
@@ -576,6 +571,7 @@ void sdi_send_buffer(const uint8_t* data, size_t len)
       SPI.transfer(*data++);
   }
   while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating command is complete
+  Serial.print("VS off");
   digitalWrite(VS_XDCS, HIGH); //Deselect Control
 
 
