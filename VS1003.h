@@ -82,7 +82,7 @@ protected:
    * @param buf Location of memory (in PROGMEM) where the code is
    * @param len Number of words to load
    */
-  void loadUserCode(const uint16_t* buf, size_t len) const;
+  //void loadUserCode(const uint16_t* buf, size_t len) const;
 
 public:
 
@@ -136,6 +136,14 @@ public:
    * @param vol Volume level from 0-255, lower is louder.
    */
   void setVolume(uint8_t vol) const;
+
+  /**
+   * Load a user code plugin
+   *
+   * @param buf Location of memory (in PROGMEM) where the code is
+   * @param len Number of words to load
+   */
+  void loadUserCode(const uint16_t* buf, size_t len) const;
 
 };
 
