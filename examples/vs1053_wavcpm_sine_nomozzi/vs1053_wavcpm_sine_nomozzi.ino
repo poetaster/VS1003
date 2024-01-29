@@ -197,7 +197,7 @@ void setup () {
     player.setVolume(0x00);
     delay(200);
     // set the header in the circ buffer
-
+    send_header();
     buffer_start();
     Serial.print("Count:");
     Serial.print(circBuffer.Count());
