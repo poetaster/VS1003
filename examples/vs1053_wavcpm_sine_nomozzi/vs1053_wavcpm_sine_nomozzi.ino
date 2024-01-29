@@ -163,18 +163,19 @@ int sampling_interval;
 byte samples[500];                                           // to store the samples
 
 
+
 void loop() {
   
-  for (int j = 0; j < 512; j++) {
+  //for (int j = 0; j < 512; j++) {
     //analogWrite(10, samples[j]);
     //circBuffer.Insert((char *)samples[j]);
       for (int n = 0; n < 32; n++)
        {
-         mp3buff[n] = samples[j];
+         mp3buff[n] = samples[n];
        }
        player.playChunk(mp3buff, 32);
     delayMicroseconds(sampling_interval);                      //time interval
-  }
+  //}
   
 
   
@@ -209,7 +210,7 @@ void setup () {
     printArray(circBuffer.ToArray(), circBuffer.Count(), ',');
     // write it out
     //write_to_stream();
-    for (int n = 0; n < 512; n++)
+    for (int n = 0; n < 32; n++)
     {
         t = (float) n / Fs;                                       //creating time isntance to find the 500 samples
         samples[n] = (byte) (127.0 * sin(2 * 3.14 * t) + 127.0 ); //calculating the sin value at each time instance
