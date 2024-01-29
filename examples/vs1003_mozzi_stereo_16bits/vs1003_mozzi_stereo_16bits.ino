@@ -63,6 +63,38 @@ const uint16_t  SS_AVOL_MASK    =   0x0003;
 const uint16_t  SS_VER_VS1053 = 0x40;
 const uint16_t  SS_VER_VS1003 = 0x30;
 
+uint8_t my_SPCR; /**< Value of the SPCR register how we like it. */
+uint8_t my_SPSR; /**< Value of the SPSR register how we like it. */
+
+void save_our_spi(void)
+{
+  my_SPSR = SPSR;
+  my_SPCR = SPCR;
+}
+void set_our_spi(void)
+{
+  SPSR = my_SPSR;
+  SPCR = my_SPCR;
+}
+
+struct spi_saver_t
+{
+  uint8_t saved_SPCR;
+  uint8_t saved_SPSR;
+
+  spi_saver_t(void)
+  {
+    saved_SPCR = SPCR;
+    saved_SPSR = SPSR;
+  }
+  ~spi_saver_t()
+  {
+    SPCR = saved_SPCR;
+    SPSR = saved_SPSR;
+  }
+};
+
+
 // VS1053 Shield pin definitions
 #define VS_XCS    9 // Control Chip Select Pin (for accessing SPI Control/Status registers)
 #define VS_XDCS   6 // Data Chip Select / BSYNC Pin
@@ -263,14 +295,55 @@ void setup() {
 
 bool driverReady = 0;
 
+void await_data_request(void)
+{
+  while ( !digitalRead(VS_DREQ) );
+}
+
+
+void control_mode_on(void)
+{
+  digitalWrite(VS_XDCS, HIGH);
+  digitalWrite(VS_XCS, LOW);
+}
+
+void control_mode_off(void)
+{
+  digitalWrite(VS_XCS, HIGH);
+}
+
+void data_mode_on(void)
+{
+  digitalWrite(VS_XCS, HIGH);
+  digitalWrite(VS_XDCS, LOW);
+}
+
+void data_mode_off(void)
+{
+  digitalWrite(VS_XDCS, HIGH);
+}
+
 void playSound() {
 
   if (driverReady) {
+    Serial.println("driver go");
     size_t len = sizeof(HelloMP3);
     uint8_t*data = HelloMP3;
-    
-    
-    send_buffer(HelloMP3, sizeof(HelloMP3));
+  data_mode_on();
+  while ( len )
+  {
+    await_data_request();
+    delayMicroseconds(3);
+
+    size_t chunk_length = min(len,32);
+    len -= chunk_length;
+    while ( chunk_length-- )
+      SPI.transfer(*data++);
+  }
+  data_mode_off();
+
+
+    //send_buffer(HelloMP3, sizeof(HelloMP3));
   }
 
 }
@@ -278,7 +351,7 @@ void playSound() {
 void loop() {
 
   Serial.println("loop");
-  
+
   VSStatus();
   delay(1000);
   //playSound();
@@ -370,7 +443,7 @@ void initialiseVS10xx () {
 
   ///From 1053Driver
   delay(10);
-  while (!digitalRead(VS_DREQ)) ; 
+  while (!digitalRead(VS_DREQ)) ;
 
   VSWriteRegister16(SCI_AUDATA, 16384);
   // The next clocksetting allows SPI clocking at 5 MHz, 4 MHz is safe then.
@@ -382,16 +455,16 @@ void initialiseVS10xx () {
   delay(10);
   while (!digitalRead(VS_DREQ)) ;
 
-  VSWriteRegister16(SCI_CLOCKF,0xB800); 
+  VSWriteRegister16(SCI_CLOCKF, 0xB800);
   /// END
   /*
-  write_register(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_RESET));
-  delay(1);
-  await_data_request();
-  write_register(SCI_CLOCKF,0xB800); // Experimenting with higher clock settings
-  delay(1);
-  await_data_request();
-*/
+    write_register(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_RESET));
+    delay(1);
+    await_data_request();
+    write_register(SCI_CLOCKF,0xB800); // Experimenting with higher clock settings
+    delay(1);
+    await_data_request();
+  */
   delay(200);
   //VSStatus();
 #ifdef TEST
@@ -537,22 +610,22 @@ void send_buffer(uint8_t *data, size_t len) {
   size_t chunk_length;
   while (!digitalRead(VS_DREQ)) {}
   digitalWrite(VS_XDCS, LOW);
-  
+
   while (len) {
-        //await_data_request(); // Wait for space available
-        chunk_length = len;
-        if (len > vs1053_chunk_size) {
-            chunk_length = vs1053_chunk_size;
-        }
-        len -= chunk_length;
-        SPI.transfer(data, chunk_length);
-        data += chunk_length;
-                             //
+    //await_data_request(); // Wait for space available
+    chunk_length = len;
+    if (len > vs1053_chunk_size) {
+      chunk_length = vs1053_chunk_size;
     }
+    len -= chunk_length;
+    SPI.transfer(data, chunk_length);
+    data += chunk_length;
+    //
+  }
 
 
   digitalWrite(VS_XDCS, HIGH);
-  
+
 }
 
 /* from VS1053 driver */
@@ -564,26 +637,26 @@ void writeAudio(uint8_t*data, size_t len) {
 
 
 void sdi_send_buffer(uint8_t *data, size_t len) {
-    size_t chunk_length; // Length of chunk 32 byte or shorter
-    data_mode_on();
-    Serial.println ('writing');
-    while (len) // More to do?
-    {
-        await_data_request(); // Wait for space available
-        chunk_length = len;
-        if (len > vs1053_chunk_size) {
-            chunk_length = vs1053_chunk_size;
-        }
-        len -= chunk_length;
-        SPI.transfer(data, chunk_length);
-        data += chunk_length;
-                             //
+  size_t chunk_length; // Length of chunk 32 byte or shorter
+  data_mode_on();
+  Serial.println ('writing');
+  while (len) // More to do?
+  {
+    await_data_request(); // Wait for space available
+    chunk_length = len;
+    if (len > vs1053_chunk_size) {
+      chunk_length = vs1053_chunk_size;
     }
-    data_mode_off();
-  } 
+    len -= chunk_length;
+    SPI.transfer(data, chunk_length);
+    data += chunk_length;
+    //
+  }
+  data_mode_off();
+}
 /*
-void sdi_send_buffer(uint8_t* data, size_t len)
-{
+  void sdi_send_buffer(uint8_t* data, size_t len)
+  {
 
   while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating IC is available
   Serial.print("VS ready");
@@ -602,21 +675,21 @@ void sdi_send_buffer(uint8_t* data, size_t len)
   while (!digitalRead(VS_DREQ)) ; //Wait for DREQ to go high indicating command is complete
   Serial.print("VS off");
   digitalWrite(VS_XDCS, HIGH); //Deselect Control
-}
+  }
 */
 
 void streamModeOn() {
-    //VS1053_LOGI("Performing streamModeOn");
-    VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_STREAM));
-    delay(10);
-    await_data_request();
+  //VS1053_LOGI("Performing streamModeOn");
+  VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_STREAM));
+  delay(10);
+  await_data_request();
 }
 
 void streamModeOff() {
-    //VS1053_LOGI("Performing streamModeOff");
-    VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW));
-    delay(10);
-    await_data_request();
+  //VS1053_LOGI("Performing streamModeOff");
+  VSWriteRegister16(SCI_MODE, _BV(SM_SDINEW));
+  delay(10);
+  await_data_request();
 }
 
 void write_bytes(uint8_t * data, uint32_t size)   {
@@ -624,34 +697,6 @@ void write_bytes(uint8_t * data, uint32_t size)   {
   // for (int i = 0; i < size; ++i) {
   //     p_spi->transfer(data[i]);
   // }
-}
-
-void await_data_request(void)
-{
-  while ( !digitalRead(VS_DREQ) );
-}
-
-
-void control_mode_on(void)
-{
-  digitalWrite(VS_XDCS, HIGH);
-  digitalWrite(VS_XCS, LOW);
-}
-
-void control_mode_off(void)
-{
-  digitalWrite(VS_XCS, HIGH);
-}
-
-void data_mode_on(void)
-{
-  digitalWrite(VS_XCS, HIGH);
-  digitalWrite(VS_XDCS, LOW);
-}
-
-void data_mode_off(void)
-{
-  digitalWrite(VS_XDCS, HIGH);
 }
 
 
