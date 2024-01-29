@@ -82,7 +82,7 @@ protected:
    * @param buf Location of memory (in PROGMEM) where the code is
    * @param len Number of words to load
    */
-  //void loadUserCode(const uint16_t* buf, size_t len) const;
+  void loadUserCode(const uint16_t* buf, size_t len) const;
 
 public:
 
@@ -123,6 +123,20 @@ public:
   void stopSong(void);
 
   /**
+   * Set streaming mode
+   *
+   * Call to set streaming mode
+   */
+  void streamModeOn(void);
+
+  /**
+   * Set streaming mode off
+   *
+   * Call to turn off streaming.
+   */
+  void streamModeOff(void);
+
+  /**
    * Print configuration details
    *
    * Dumps all registers to stdout.  Be sure to have stdout configured first
@@ -136,14 +150,6 @@ public:
    * @param vol Volume level from 0-255, lower is louder.
    */
   void setVolume(uint8_t vol) const;
-
-  /**
-   * Load a user code plugin
-   *
-   * @param buf Location of memory (in PROGMEM) where the code is
-   * @param len Number of words to load
-   */
-  void loadUserCode(const uint16_t* buf, size_t len) const;
 
 };
 
